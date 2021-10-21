@@ -8,7 +8,10 @@ import com.bank.investments.exceptions.NotSuchAccountException;
 import com.bank.investments.repository.InvestmentRepository;
 import com.bank.investments.request.InvestmentRequest;
 
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -22,6 +25,9 @@ public class InvestmentService {
 
     private final AccountClient accountClient;
 
+    private static final String ACCOUNT_SERVICE ="accountService" ;
+
+    @RateLimiter(name=ACCOUNT_SERVICE, fallbackMethod = "rateLimiterFallback")
     public Investment createInvestment(InvestmentRequest investmentRequest){
         String accountId = accountClient
                 .findById(Integer.parseInt(investmentRequest
@@ -42,6 +48,7 @@ public class InvestmentService {
         return thisInvestment;}
     }
 
+    @RateLimiter(name=ACCOUNT_SERVICE, fallbackMethod = "rateLimiterFallback")
     public Investment receiveIncome(int investmentId){
         Investment thisInvestment = investmentRepository.getById(investmentId);
         BigDecimal money = thisInvestment.getInvestmentAmmount();
@@ -49,5 +56,8 @@ public class InvestmentService {
         thisInvestment.setStatus(InvestmentStatus.CLOSED);
         investmentRepository.save(thisInvestment);
         return thisInvestment;}
+
+    public ResponseEntity<String> rateLimiterFallback(Exception e){
+        return new ResponseEntity<String>("account service does not permit further calls", HttpStatus.TOO_MANY_REQUESTS);}
 
 }
